@@ -1,4 +1,4 @@
-# Autonomous-Venue-Operations# Autonomous Venue Operations (AVO)
+# Autonomous Venue Operations (AVO)
 
 A **venue-neutral, local-first prototype** for operating shared rental spaces: funeral halls, meeting rooms, studios, classrooms, event spaces, and other reservable facilities.
 
@@ -26,6 +26,28 @@ python -m unittest discover -s tests -v
 - Simulated time-bound lock authorization (offline = deny)
 - Hash-chained audit log and integrity verification
 - Automated tests for conflicts, permissions, time boundaries, offline mode, and audit tampering
+- Vendor-neutral `LockAdapter` interface, review-only RemoteLOCK/Akerun/SESAME
+  intent planners, and an in-memory virtual-lock lifecycle test fixture
+
+## Access-device adapter boundary
+
+```python
+from avo.adapters import AccessGrant, adapter_for
+
+grant = AccessGrant("hall-1", "reservation-1", "tenant-1",
+                    "2026-11-22T09:00:00+09:00", "2026-11-22T12:00:00+09:00")
+intent = adapter_for("remotelock").plan_grant("door-1", grant)
+assert intent.requires_human_approval  # NO device command was sent
+```
+
+`RemoteLockAdapter`, `AkerunAdapter`, and `SesameAdapter` currently produce
+provider-tagged *review intents only*. They do not call vendor APIs or encode
+unverified vendor request schemas. `VirtualLockAdapter` alone can apply
+simulated grants in memory; there are no real-hardware unlock methods.
+
+Before adding physical integrations, check vendor API terms and device-specific
+support for time windows, revoke propagation, offline behavior, emergency egress,
+and independently approved operational controls.
 
 ## Not included yet
 
@@ -33,7 +55,7 @@ python -m unittest discover -s tests -v
 - Production concurrency controls across processes, robust migration management, backup/restore
 - Secure device identity, key lifecycle, signed telemetry, hardware attestation
 - Building code, fire/egress, accessibility or personal-data compliance validation
-- Human handoff, payments, cleaning workflows, occupancy safety, integration adapters
+- Human handoff, payments, cleaning workflows, occupancy safety, production-grade vendor API integration
 
 ## Production security boundaries
 
@@ -46,6 +68,23 @@ Never connect the simulator directly to a door. In production, a dedicated certi
 3. Adapter contracts for *simulated* device interfaces and supervised exception handling.
 4. Cleaning/maintenance workflows, status dashboards, redacted audit exports.
 5. Independent security review and controlled pilot only after legal and hardware safety assessment.
+
+## Monthly Excel schedule
+
+For operators, the JSON booking feed can be rendered into a Japanese monthly
+Excel schedule. Requires the project authoring environment with
+`@oai/artifact-tool` available to Node.js (development dependency only).
+
+```bash
+python -m avo.monthly --database venue.db --year 2026 --month 12 --output monthly.json
+node scripts/export_monthly.mjs monthly.json monthly.xlsx
+```
+
+The workbook includes a human-readable day-by-day schedule and reservation
+details. It only exports active bookings; empty dates are labeled `空き`. Tenant
+IDs are shown as entered (do not use customer personal information in them).
+Note: `空き` means no registered reservation, **not** certified operational
+availability; closures, cleaning buffers, and maintenance are not modeled yet.
 
 ## IP and operating boundaries
 
